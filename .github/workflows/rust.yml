@@ -1,0 +1,144 @@
+name: Rust
+
+on:
+  push:
+    tags:
+      - "T*" # Test releases
+      - "R*" # Regular releases
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install mold linker and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mold \
+            libasound2-dev libudev-dev pkg-config \
+            libxkbcommon-dev libwayland-dev \
+            libatk1.0-dev libatk-bridge2.0-dev \
+            libgtk-3-dev libayatana-appindicator3-dev
+
+      - name: Build
+        env:
+          RUSTFLAGS: "-Clink-arg=-fuse-ld=mold -Zshare-generics=y -Zthreads=0"
+        run: cargo build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: simphy-linux
+          path: target/release/simphy
+          retention-days: 7 # Clean up old artifacts
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Build
+        env:
+          RUSTFLAGS: "-Zshare-generics=n -Zthreads=0"
+          CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: "rust-lld.exe"
+          CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTDOCFLAGS: "-Clinker=rust-lld.exe"
+        run: cargo build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: simphy-windows
+          path: target/release/simphy.exe
+          retention-days: 7
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install macOS dependencies
+        run: |
+          brew install pkg-config
+
+      - name: Build
+        env:
+          RUSTFLAGS: "-Zthreads=0"
+        run: cargo build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: simphy-macos
+          path: target/release/simphy
+          retention-days: 7
+
+  release:
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: success() # Only run if all builds succeeded
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: simphy-*
+          merge-multiple: true
+
+      - name: Verify and prepare release files
+        run: |
+          # List all downloaded files
+          echo "Downloaded files:"
+          find artifacts -type f -exec ls -lh {} \;
+
+          # Verify files exist
+          if [ ! -f "artifacts/simphy-linux" ]; then
+            echo "Error: Linux binary not found!"
+            exit 1
+          fi
+          if [ ! -f "artifacts/simphy-windows.exe" ]; then
+            echo "Error: Windows binary not found!"
+            exit 1
+          fi
+          if [ ! -f "artifacts/simphy-macos" ]; then
+            echo "Error: macOS binary not found!"
+            exit 1
+          fi
+
+          # Make Linux and macOS binaries executable
+          chmod +x artifacts/simphy-linux artifacts/simphy-macos
+
+          # Move files to current directory
+          mv artifacts/simphy-linux .
+          mv artifacts/simphy-windows.exe .
+          mv artifacts/simphy-macos .
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            simphy-linux
+            simphy-windows.exe
+            simphy-macos
+          generate_release_notes: true
+          skip_duplicate: true
+          draft: false
+          prerelease: ${{ startsWith(github.ref, 'refs/tags/T') }} # T* tags are prereleases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

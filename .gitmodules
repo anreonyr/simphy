@@ -1,6 +1,0 @@
-[submodule "openspec"]
-	path = openspec
-	url = ./openspec
-[submodule ".claude"]
-	path = .claude
-	url = ./.claude

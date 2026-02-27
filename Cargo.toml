@@ -15,8 +15,9 @@ serde_yaml = "0.9"
 ron = "0.8"
 
 [features]
-default = []
-dev = ["bevy/dynamic_linking", "bevy/debug"]
+default = ["dev"]
+dev = ["bevy/dynamic_linking"]
+release = []
 
 [profile.dev]
 opt-level = 1
