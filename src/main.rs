@@ -1,5 +1,6 @@
 pub mod app;
 pub mod camera;
+#[cfg(feature = "dev")]
 pub mod dev;
 pub mod editor;
 pub mod input;
@@ -12,13 +13,16 @@ pub mod ui;
 use bevy::prelude::*;
 
 fn main() {
-    App::new()
-        .add_plugins(app::AppPlugin)
+    let mut app = App::new();
+    app.add_plugins(app::AppPlugin)
         .add_plugins(simulation::SimulationPlugin)
         .add_plugins(input::ActionPlugin)
         .add_plugins(editor::EditorPlugin)
         .add_plugins(ui::UiPlugin)
-        .add_plugins(dev::DevSetupPlugin)
-        .add_plugins(camera::CameraPlugin)
-        .run();
+        .add_plugins(camera::CameraPlugin);
+
+    #[cfg(feature = "dev")]
+    app.add_plugins(dev::DevSetupPlugin);
+
+    app.run();
 }
