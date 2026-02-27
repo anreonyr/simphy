@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Build Windows
+        run: cargo build --release
+
+      - name: Build Ubuntu
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config libxkbcommon-dev
+          cargo build --release
+
+      - name: Build macOS
+        run: |
+          brew install SDL2
+          cargo build --release
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            target/release/simphy.exe
+            target/release/simphy
+            target/release/simphy_macos
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
