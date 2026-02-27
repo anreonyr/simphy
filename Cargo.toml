@@ -26,7 +26,17 @@ opt-level = 1
 opt-level = 3
 
 [profile.release]
+default-features = false
 opt-level = 3
 lto = "thin"
 panic = "abort"
 strip = true
+
+[target.x86_64-unknown-linux-gnu.release]
+rustflags = ["-Clink-arg=-fuse-ld=mold", "-Zshare-generics=y", "-Zthreads=0"]
+
+[target.x86_64-pc-windows-msvc.release]
+rustflags = ["-Zshare-generics=n", "-Zthreads=0"]
+
+[target.aarch64-apple-darwin.release]
+rustflags = ["-Zthreads=0"]

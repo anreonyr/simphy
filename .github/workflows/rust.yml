@@ -30,9 +30,7 @@ jobs:
             libgtk-3-dev libayatana-appindicator3-dev
 
       - name: Build
-        env:
-          RUSTFLAGS: "-Clink-arg=-fuse-ld=mold -Zshare-generics=y -Zthreads=0"
-        run: cargo build --release
+        run: cargo build --release --no-default-features
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -52,10 +50,8 @@ jobs:
 
       - name: Build
         env:
-          RUSTFLAGS: "-Zshare-generics=n -Zthreads=0"
           CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: "rust-lld.exe"
-          CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTDOCFLAGS: "-Clinker=rust-lld.exe"
-        run: cargo build --release
+        run: cargo build --release --no-default-features
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -78,9 +74,7 @@ jobs:
           brew install pkg-config
 
       - name: Build
-        env:
-          RUSTFLAGS: "-Zthreads=0"
-        run: cargo build --release
+        run: cargo build --release --no-default-features
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -94,12 +88,23 @@ jobs:
     runs-on: ubuntu-latest
     if: success() # Only run if all builds succeeded
     steps:
-      - name: Download artifacts
+      - name: Download Linux artifact
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
-          pattern: simphy-*
-          merge-multiple: true
+          name: simphy-linux
+          path: artifacts/linux
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: simphy-windows
+          path: artifacts/windows
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: simphy-macos
+          path: artifacts/macos
 
       - name: Verify and prepare release files
         run: |
@@ -107,35 +112,35 @@ jobs:
           echo "Downloaded files:"
           find artifacts -type f -exec ls -lh {} \;
 
-          # Verify files exist
-          if [ ! -f "artifacts/simphy-linux" ]; then
+          # Verify files exist (each in its own subdirectory)
+          if [ ! -f "artifacts/linux/simphy" ]; then
             echo "Error: Linux binary not found!"
             exit 1
           fi
-          if [ ! -f "artifacts/simphy-windows.exe" ]; then
+          if [ ! -f "artifacts/windows/simphy.exe" ]; then
             echo "Error: Windows binary not found!"
             exit 1
           fi
-          if [ ! -f "artifacts/simphy-macos" ]; then
+          if [ ! -f "artifacts/macos/simphy" ]; then
             echo "Error: macOS binary not found!"
             exit 1
           fi
 
           # Make Linux and macOS binaries executable
-          chmod +x artifacts/simphy-linux artifacts/simphy-macos
+          chmod +x artifacts/linux/simphy artifacts/macos/simphy
 
-          # Move files to current directory
-          mv artifacts/simphy-linux .
-          mv artifacts/simphy-windows.exe .
-          mv artifacts/simphy-macos .
+          # Move files to current directory with correct names
+          mv artifacts/linux/simphy ./simphy-linux
+          mv artifacts/windows/simphy.exe ./simphy-windows.exe
+          mv artifacts/macos/simphy ./simphy-macos
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            simphy-linux
-            simphy-windows.exe
-            simphy-macos
+            ./simphy-linux
+            ./simphy-windows.exe
+            ./simphy-macos
           generate_release_notes: true
           skip_duplicate: true
           draft: false
